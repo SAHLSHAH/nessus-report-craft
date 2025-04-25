@@ -236,48 +236,129 @@ const generateReportHeader = (companyDetails: CompanyDetails): string => {
     <html>
     <head>
     <style>
-      body { font-family: Arial, sans-serif; }
+      body { 
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+      }
       .header { 
-        background-color: #1A1F2C;
-        color: white;
-        padding: 20px;
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        padding: 20px;
+        border-bottom: 2px solid #000;
       }
-      .company-info {
-        margin-left: 20px;
+      .company-logo {
+        max-width: 200px;
+        max-height: 100px;
       }
-      table {
+      .vulnerability-table {
         width: 100%;
         border-collapse: collapse;
         margin: 20px 0;
+        border: 1px solid #000;
       }
-      th {
-        background-color: #8B5CF6;
-        color: white;
+      .vulnerability-header {
+        background-color: #f5f5f5;
         padding: 10px;
-        text-align: left;
+        border: 1px solid #000;
+      }
+      .vulnerability-title {
+        font-size: 16px;
+        color: #ea384c;
+        margin: 0;
+        padding: 10px;
+        border-bottom: 1px solid #000;
+      }
+      .rating-row {
+        display: flex;
+      }
+      .rating-cell {
+        background-color: #ea384c;
+        color: white;
+        padding: 8px;
+        width: 50%;
+        border: 1px solid #000;
+      }
+      .cvss-cell {
+        padding: 8px;
+        width: 50%;
+        border: 1px solid #000;
       }
       td {
         padding: 8px;
-        border: 1px solid #ddd;
+        border: 1px solid #000;
       }
-      .severity-critical { color: #ea384c; }
-      .severity-high { color: #f97316; }
-      .severity-medium { color: #eab308; }
-      .severity-low { color: #22c55e; }
-      .severity-info { color: #3b82f6; }
+      .severity-critical { background-color: #ea384c; color: white; }
+      .severity-high { background-color: #f97316; color: white; }
+      .severity-medium { background-color: #eab308; color: white; }
+      .severity-low { background-color: #22c55e; color: white; }
+      .severity-info { background-color: #3b82f6; color: white; }
+      .recommendation-list {
+        list-style-type: decimal;
+        padding-left: 20px;
+      }
+      .poc-section img {
+        max-width: 100%;
+        border: 1px solid #ddd;
+        margin-top: 10px;
+      }
     </style>
     </head>
     <body>
       <div class="header">
-        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMxQTFGMkMiLz4KPHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNDAiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBhbGlnbm1lbnQtYmFzZWxpbmU9Im1pZGRsZSI+JHtjb21wYW55RGV0YWlscy5jb21wYW55TmFtZS5jaGFyQXQoMCl9PC90ZXh0Pgo8L3N2Zz4=" width="100" height="100" />
-        <div class="company-info">
+        ${companyDetails.companyLogo ? 
+          `<img src="${companyDetails.companyLogo}" alt="Company Logo" class="company-logo" />` :
+          ''
+        }
+        <div>
           <h1>${companyDetails.companyName}</h1>
           <p>Date: ${companyDetails.reportDate.toLocaleDateString()}</p>
           <p>Prepared By: ${companyDetails.preparedBy}</p>
         </div>
       </div>
+  `;
+};
+
+const generateVulnerabilitySection = (vuln: Vulnerability, index: number): string => {
+  return `
+    <div class="vulnerability-table">
+      <div class="vulnerability-header">
+        <h2 class="vulnerability-title">${index + 1}. Vulnerability Name: ${vuln.title}</h2>
+      </div>
+      
+      <div class="rating-row">
+        <div class="rating-cell">Vulnerability Rating: ${vuln.severity}</div>
+        <div class="cvss-cell">CVSS: ${vuln.cvss}</div>
+      </div>
+      
+      <table width="100%">
+        <tr>
+          <td><strong>OWASP Category:</strong></td>
+          <td>Security Misconfiguration</td>
+        </tr>
+        <tr>
+          <td><strong>URL:</strong></td>
+          <td>${vuln.pluginId}</td>
+        </tr>
+        <tr>
+          <td><strong>Description:</strong></td>
+          <td>${vuln.description}</td>
+        </tr>
+        <tr>
+          <td><strong>Impact:</strong></td>
+          <td>
+            - Potential security breach<br>
+            - Data exposure risk<br>
+            - Compliance violations
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Recommendation:</strong></td>
+          <td>${vuln.solution}</td>
+        </tr>
+      </table>
+    </div>
   `;
 };
 
@@ -322,7 +403,7 @@ export const generateReport = async (
   
   reportContent += `
     <h2 style="color: #1A1F2C; margin-top: 30px;">EXECUTIVE SUMMARY</h2>
-    <table>
+    <table class="vulnerability-table">
       <tr>
         <th>Category</th>
         <th>Count</th>
@@ -331,106 +412,47 @@ export const generateReport = async (
         <td>Total Hosts Analyzed</td>
         <td>${mergedHosts.length}</td>
       </tr>
-      <tr>
+      <tr class="severity-critical">
         <td>Critical Vulnerabilities</td>
-        <td class="severity-critical">${vulnerabilityTotals.critical}</td>
+        <td>${vulnerabilityTotals.critical}</td>
       </tr>
-      <tr>
+      <tr class="severity-high">
         <td>High Vulnerabilities</td>
-        <td class="severity-high">${vulnerabilityTotals.high}</td>
+        <td>${vulnerabilityTotals.high}</td>
       </tr>
-      <tr>
+      <tr class="severity-medium">
         <td>Medium Vulnerabilities</td>
-        <td class="severity-medium">${vulnerabilityTotals.medium}</td>
+        <td>${vulnerabilityTotals.medium}</td>
       </tr>
-      <tr>
+      <tr class="severity-low">
         <td>Low Vulnerabilities</td>
-        <td class="severity-low">${vulnerabilityTotals.low}</td>
+        <td>${vulnerabilityTotals.low}</td>
       </tr>
-      <tr>
+      <tr class="severity-info">
         <td>Informational Findings</td>
-        <td class="severity-info">${vulnerabilityTotals.info}</td>
+        <td>${vulnerabilityTotals.info}</td>
       </tr>
     </table>
   `;
 
+  reportContent += `<h2 style="color: #1A1F2C; margin-top: 30px;">DETAILED FINDINGS</h2>`;
+  
   mergedHosts.forEach(host => {
-    reportContent += `
-      <h2 style="color: #1A1F2C; margin-top: 30px;">HOST: ${host.ip} (${host.hostname})</h2>
-      
-      ${['critical', 'high', 'medium', 'low', 'info'].map(severity => {
-        const vulns = host.vulnerabilities[severity as keyof typeof host.vulnerabilities];
-        if (vulns.length === 0) return '';
-        
-        return `
-          <h3 class="severity-${severity}" style="margin-top: 20px;">
-            ${severity.toUpperCase()} VULNERABILITIES (${vulns.length})
-          </h3>
-          <table>
-            <tr>
-              <th>Plugin ID</th>
-              <th>Title</th>
-              <th>CVSS</th>
-              <th>Count</th>
-            </tr>
-            ${vulns.map(vuln => `
-              <tr>
-                <td>${vuln.pluginId}</td>
-                <td>
-                  <strong>${vuln.title}</strong>
-                  <p style="margin: 5px 0; color: #666;">${vuln.description}</p>
-                  <p style="margin: 5px 0; color: #444;"><strong>Solution:</strong> ${vuln.solution}</p>
-                </td>
-                <td>${vuln.cvss}</td>
-                <td>${vuln.count || 1}</td>
-              </tr>
-            `).join('')}
-          </table>
-        `;
-      }).join('')}
-    `;
+    const allVulnerabilities = [
+      ...host.vulnerabilities.critical,
+      ...host.vulnerabilities.high,
+      ...host.vulnerabilities.medium,
+      ...host.vulnerabilities.low,
+      ...host.vulnerabilities.info
+    ];
+
+    allVulnerabilities.forEach((vuln, index) => {
+      reportContent += generateVulnerabilitySection(vuln, index);
+    });
   });
 
-  reportContent += `
-    <h2 style="color: #1A1F2C; margin-top: 30px;">REMEDIATION RECOMMENDATIONS</h2>
-    <table>
-      <tr>
-        <th>Priority</th>
-        <th>Actions</th>
-      </tr>
-      <tr>
-        <td style="background-color: #fef2f2;">High Priority</td>
-        <td>
-          <ul>
-            <li>Address all Critical and High vulnerabilities immediately</li>
-            <li>Focus on vulnerabilities with highest occurrence counts first</li>
-          </ul>
-        </td>
-      </tr>
-      <tr>
-        <td style="background-color: #fffbeb;">Medium Priority</td>
-        <td>
-          <ul>
-            <li>Schedule remediation for Medium vulnerabilities within 30 days</li>
-            <li>Group similar vulnerabilities for efficient patching cycles</li>
-          </ul>
-        </td>
-      </tr>
-      <tr>
-        <td style="background-color: #f0fdf4;">Low Priority</td>
-        <td>
-          <ul>
-            <li>Document Low and Informational findings</li>
-            <li>Address during regular maintenance windows</li>
-          </ul>
-        </td>
-      </tr>
-    </table>
-    </body>
-    </html>
-  `;
+  reportContent += `</body></html>`;
 
-  completedSteps++;
   if (onProgress) {
     onProgress(100);
   }

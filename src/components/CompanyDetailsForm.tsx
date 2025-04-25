@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -17,14 +17,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Define the form schema
 const formSchema = z.object({
   companyName: z.string().min(1, { message: "Company name is required" }),
   reportDate: z.date({ required_error: "Report date is required" }),
   preparedBy: z.string().min(1, { message: "Preparer name is required" }),
+  companyLogo: z.any().optional(),
 });
 
 export type CompanyDetails = z.infer<typeof formSchema>;
@@ -38,7 +38,8 @@ const CompanyDetailsForm: React.FC<CompanyDetailsFormProps> = ({
   onSubmit,
   isDisabled = false
 }) => {
-  // Initialize form with default values
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
   const form = useForm<CompanyDetails>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -48,8 +49,20 @@ const CompanyDetailsForm: React.FC<CompanyDetailsFormProps> = ({
     },
   });
 
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+        form.setValue('companyLogo', reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = (values: CompanyDetails) => {
-    onSubmit(values);
+    onSubmit({ ...values, companyLogo: logoPreview });
   };
 
   return (
@@ -122,6 +135,37 @@ const CompanyDetailsForm: React.FC<CompanyDetailsFormProps> = ({
               <FormLabel>Prepared By</FormLabel>
               <FormControl>
                 <Input placeholder="John Doe" {...field} disabled={isDisabled} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="companyLogo"
+          render={() => (
+            <FormItem>
+              <FormLabel>Company Logo</FormLabel>
+              <FormControl>
+                <div className="flex flex-col items-center space-y-4">
+                  {logoPreview && (
+                    <div className="w-32 h-32 border rounded-lg overflow-hidden">
+                      <img 
+                        src={logoPreview} 
+                        alt="Company logo preview" 
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  )}
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    disabled={isDisabled}
+                    className="w-full"
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
