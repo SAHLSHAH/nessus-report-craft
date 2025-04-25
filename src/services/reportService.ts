@@ -9,6 +9,7 @@ interface Vulnerability {
   description: string;
   solution: string;
   cvss: string;
+  count?: number; // Track how many times this vulnerability appears across files
 }
 
 interface Host {
@@ -67,6 +68,7 @@ const generateRandomVulnerabilities = (severity: 'Critical' | 'High' | 'Medium' 
       description: `This is a sample ${severity.toLowerCase()} vulnerability that was detected.`,
       solution: 'Update the affected software to the latest version.',
       cvss: (Math.random() * 10).toFixed(1),
+      count: 1, // Initially found once
     });
   }
   
@@ -84,33 +86,30 @@ const mergeHosts = (hostArrays: Host[][]): Host[] => {
         // Merge vulnerabilities if the host already exists
         const existingHost = hostMap.get(host.ip)!;
         
-        existingHost.vulnerabilities.critical = [
-          ...existingHost.vulnerabilities.critical,
-          ...host.vulnerabilities.critical
-        ];
-        existingHost.vulnerabilities.high = [
-          ...existingHost.vulnerabilities.high,
-          ...host.vulnerabilities.high
-        ];
-        existingHost.vulnerabilities.medium = [
-          ...existingHost.vulnerabilities.medium,
-          ...host.vulnerabilities.medium
-        ];
-        existingHost.vulnerabilities.low = [
-          ...existingHost.vulnerabilities.low,
-          ...host.vulnerabilities.low
-        ];
-        existingHost.vulnerabilities.info = [
-          ...existingHost.vulnerabilities.info,
-          ...host.vulnerabilities.info
-        ];
+        existingHost.vulnerabilities.critical = mergeAndCountVulnerabilities(
+          existingHost.vulnerabilities.critical, 
+          host.vulnerabilities.critical
+        );
         
-        // Deduplicate vulnerabilities by pluginId
-        existingHost.vulnerabilities.critical = deduplicateVulnerabilities(existingHost.vulnerabilities.critical);
-        existingHost.vulnerabilities.high = deduplicateVulnerabilities(existingHost.vulnerabilities.high);
-        existingHost.vulnerabilities.medium = deduplicateVulnerabilities(existingHost.vulnerabilities.medium);
-        existingHost.vulnerabilities.low = deduplicateVulnerabilities(existingHost.vulnerabilities.low);
-        existingHost.vulnerabilities.info = deduplicateVulnerabilities(existingHost.vulnerabilities.info);
+        existingHost.vulnerabilities.high = mergeAndCountVulnerabilities(
+          existingHost.vulnerabilities.high, 
+          host.vulnerabilities.high
+        );
+        
+        existingHost.vulnerabilities.medium = mergeAndCountVulnerabilities(
+          existingHost.vulnerabilities.medium, 
+          host.vulnerabilities.medium
+        );
+        
+        existingHost.vulnerabilities.low = mergeAndCountVulnerabilities(
+          existingHost.vulnerabilities.low, 
+          host.vulnerabilities.low
+        );
+        
+        existingHost.vulnerabilities.info = mergeAndCountVulnerabilities(
+          existingHost.vulnerabilities.info, 
+          host.vulnerabilities.info
+        );
         
         hostMap.set(host.ip, existingHost);
       } else {
@@ -143,13 +142,56 @@ const mergeHosts = (hostArrays: Host[][]): Host[] => {
   });
 };
 
-// Deduplicate vulnerabilities by pluginId
-const deduplicateVulnerabilities = (vulnerabilities: Vulnerability[]): Vulnerability[] => {
-  const uniqueVulnerabilities = new Map<string, Vulnerability>();
-  vulnerabilities.forEach(vuln => {
-    uniqueVulnerabilities.set(vuln.pluginId, vuln);
+// Merge and count occurrences of vulnerabilities
+const mergeAndCountVulnerabilities = (existingVulns: Vulnerability[], newVulns: Vulnerability[]): Vulnerability[] => {
+  const vulnMap = new Map<string, Vulnerability>();
+  
+  // Process existing vulnerabilities
+  existingVulns.forEach(vuln => {
+    vulnMap.set(vuln.pluginId, { ...vuln });
   });
-  return Array.from(uniqueVulnerabilities.values());
+  
+  // Merge and count new vulnerabilities
+  newVulns.forEach(vuln => {
+    if (vulnMap.has(vuln.pluginId)) {
+      const existingVuln = vulnMap.get(vuln.pluginId)!;
+      existingVuln.count = (existingVuln.count || 1) + 1;
+      vulnMap.set(vuln.pluginId, existingVuln);
+    } else {
+      vulnMap.set(vuln.pluginId, { ...vuln, count: 1 });
+    }
+  });
+  
+  // Convert map back to array and sort by occurrence count (descending)
+  return Array.from(vulnMap.values()).sort((a, b) => {
+    // Sort by count first (higher count first)
+    if ((b.count || 1) !== (a.count || 1)) {
+      return (b.count || 1) - (a.count || 1);
+    }
+    // If counts are equal, sort by CVSS score (higher score first)
+    return parseFloat(b.cvss) - parseFloat(a.cvss);
+  });
+};
+
+// Calculate total vulnerability counts by severity
+const calculateVulnerabilityTotals = (hosts: Host[]): Record<string, number> => {
+  const totals = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    info: 0
+  };
+  
+  hosts.forEach(host => {
+    totals.critical += host.vulnerabilities.critical.length;
+    totals.high += host.vulnerabilities.high.length;
+    totals.medium += host.vulnerabilities.medium.length;
+    totals.low += host.vulnerabilities.low.length;
+    totals.info += host.vulnerabilities.info.length;
+  });
+  
+  return totals;
 };
 
 // Simulate file processing and report generation
@@ -183,6 +225,7 @@ export const generateReport = async (
   
   // Step 3: Final sorting and processing
   await new Promise(resolve => setTimeout(resolve, 700));
+  const vulnerabilityTotals = calculateVulnerabilityTotals(mergedHosts);
   completedSteps++;
   if (onProgress) {
     onProgress(Math.floor((completedSteps / totalSteps) * 100));
@@ -191,23 +234,31 @@ export const generateReport = async (
   // Step 4: Generate report content
   await new Promise(resolve => setTimeout(resolve, 1000));
   
-  // Generate the report content
+  // Generate the report content with formatted layout
   let reportContent = `
     NESSUS VULNERABILITY REPORT
     
     Company: ${companyDetails.companyName}
     Date: ${companyDetails.reportDate.toLocaleDateString()}
-    Prepared by: ${companyDetails.preparedBy}
+    Prepared By: ${companyDetails.preparedBy}
     
-    SUMMARY:
+    EXECUTIVE SUMMARY:
+    =====================================================
     Total Hosts Analyzed: ${mergedHosts.length}
     Files Processed: ${files.map(file => file.name).join(', ')}
     
-    VULNERABILITY FINDINGS:
+    VULNERABILITY SUMMARY:
+    - Critical Vulnerabilities: ${vulnerabilityTotals.critical}
+    - High Vulnerabilities: ${vulnerabilityTotals.high}
+    - Medium Vulnerabilities: ${vulnerabilityTotals.medium}
+    - Low Vulnerabilities: ${vulnerabilityTotals.low}
+    - Informational Findings: ${vulnerabilityTotals.info}
+    
+    DETAILED FINDINGS BY HOST:
     =====================================================
   `;
   
-  // Add content for each host
+  // Add content for each host, prioritizing severity sequence
   mergedHosts.forEach(host => {
     reportContent += `\n\nHOST: ${host.ip} (${host.hostname})\n`;
     reportContent += `=====================================================\n`;
@@ -220,6 +271,7 @@ export const generateReport = async (
       { title: 'INFORMATIONAL FINDINGS', vulns: host.vulnerabilities.info }
     ];
     
+    // Process each category in severity order (Critical → High → Medium → Low → Info)
     for (const category of categories) {
       if (category.vulns.length > 0) {
         reportContent += `\n${category.title} (${category.vulns.length}):\n`;
@@ -228,6 +280,9 @@ export const generateReport = async (
         category.vulns.forEach(vuln => {
           reportContent += `\n[${vuln.pluginId}] ${vuln.title}\n`;
           reportContent += `CVSS: ${vuln.cvss}\n`;
+          if (vuln.count && vuln.count > 1) {
+            reportContent += `Occurrence Count: ${vuln.count} instances\n`;
+          }
           reportContent += `Description: ${vuln.description}\n`;
           reportContent += `Solution: ${vuln.solution}\n\n`;
         });
@@ -235,10 +290,29 @@ export const generateReport = async (
     }
   });
   
+  // Add remediation summary section
+  reportContent += `
+    REMEDIATION RECOMMENDATIONS:
+    =====================================================
+    
+    HIGH PRIORITY:
+    - Address all Critical and High vulnerabilities immediately
+    - Focus on vulnerabilities with highest occurrence counts first
+    
+    MEDIUM PRIORITY:
+    - Schedule remediation for Medium vulnerabilities within 30 days
+    - Group similar vulnerabilities for efficient patching cycles
+    
+    LOW PRIORITY:
+    - Document Low and Informational findings
+    - Address during regular maintenance windows
+  `;
+  
   completedSteps++;
   if (onProgress) {
     onProgress(100);
   }
 
-  return new Blob([reportContent], { type: 'text/plain' });
+  // Return a Word document-like format (in real implementation, this would create an actual .docx file)
+  return new Blob([reportContent], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 };
