@@ -1,12 +1,21 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
 interface ReportGeneratingProps {
   progress?: number;
 }
 
 const ReportGenerating: React.FC<ReportGeneratingProps> = ({ progress }) => {
+  const [progressValue, setProgressValue] = useState(progress || 0);
+
+  useEffect(() => {
+    if (progress !== undefined) {
+      setProgressValue(progress);
+    }
+  }, [progress]);
+
   return (
     <div className="flex flex-col items-center justify-center py-10 space-y-4 animate-fade-in">
       <Loader2 className="h-12 w-12 text-security-teal animate-spin" />
@@ -17,12 +26,7 @@ const ReportGenerating: React.FC<ReportGeneratingProps> = ({ progress }) => {
       
       {progress !== undefined && (
         <div className="w-full max-w-md mt-4">
-          <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-security-teal" 
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
+          <Progress value={progressValue} className="h-2" />
           <p className="text-xs text-center mt-1 text-gray-500">{progress}% Complete</p>
         </div>
       )}
