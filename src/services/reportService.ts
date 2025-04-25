@@ -1,6 +1,4 @@
-
 import { CompanyDetails } from '@/components/CompanyDetailsForm';
-import { DOMParser } from '@xmldom/xmldom';
 import { XMLParser } from 'fast-xml-parser';
 
 interface Vulnerability {
@@ -26,12 +24,10 @@ interface Host {
   };
 }
 
-// Function to parse a Nessus XML file
 const parseNessusFile = async (file: File): Promise<Host[]> => {
   try {
     const fileContent = await file.text();
     
-    // Use fast-xml-parser for better performance
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '@_',
@@ -39,22 +35,18 @@ const parseNessusFile = async (file: File): Promise<Host[]> => {
     
     const result = parser.parse(fileContent);
     
-    // Extract NessusClientData_v2 element which contains the report
     const nessusData = result?.NessusClientData_v2 || {};
     const report = nessusData.Report || {};
     
-    // ReportHost elements contain information about scanned hosts
     const reportHosts = Array.isArray(report.ReportHost) 
       ? report.ReportHost 
       : report.ReportHost ? [report.ReportHost] : [];
       
     const hosts: Host[] = [];
     
-    // Process each host in the Nessus report
     for (const reportHost of reportHosts) {
       const hostname = reportHost['@_name'] || '';
       
-      // Find IP address from HostProperties
       let ip = '';
       const hostProperties = reportHost.HostProperties?.tag || [];
       
@@ -65,7 +57,6 @@ const parseNessusFile = async (file: File): Promise<Host[]> => {
         ip = hostProperties['@_name'] === 'host-ip' ? hostProperties['#text'] : hostname;
       }
       
-      // Process ReportItems which contain vulnerability information
       const reportItems = Array.isArray(reportHost.ReportItem) 
         ? reportHost.ReportItem 
         : reportHost.ReportItem ? [reportHost.ReportItem] : [];
@@ -84,9 +75,7 @@ const parseNessusFile = async (file: File): Promise<Host[]> => {
         info: []
       };
       
-      // Process each vulnerability for this host
       for (const item of reportItems) {
-        // Map Nessus severity (0-4) to our categories
         let severityCategory: 'Critical' | 'High' | 'Medium' | 'Low' | 'Info';
         const severityValue = parseInt(item['@_severity'] || '0');
         
@@ -107,7 +96,6 @@ const parseNessusFile = async (file: File): Promise<Host[]> => {
             severityCategory = 'Info';
         }
         
-        // Extract relevant vulnerability information
         const vulnerability: Vulnerability = {
           id: item['@_id'] || Math.random().toString(36).substring(2, 10),
           pluginId: item['@_pluginID'] || '',
@@ -136,15 +124,12 @@ const parseNessusFile = async (file: File): Promise<Host[]> => {
   }
 };
 
-// Merge hosts from multiple parsed files
 const mergeHosts = (hostArrays: Host[][]): Host[] => {
   const hostMap = new Map<string, Host>();
   
-  // Iterate through all host arrays and merge by IP address
   for (const hostArray of hostArrays) {
     for (const host of hostArray) {
       if (hostMap.has(host.ip)) {
-        // Merge vulnerabilities if the host already exists
         const existingHost = hostMap.get(host.ip)!;
         
         existingHost.vulnerabilities.critical = mergeAndCountVulnerabilities(
@@ -174,7 +159,6 @@ const mergeHosts = (hostArrays: Host[][]): Host[] => {
         
         hostMap.set(host.ip, existingHost);
       } else {
-        // Add new host to the map
         hostMap.set(host.ip, {
           ...host,
           vulnerabilities: {
@@ -189,7 +173,6 @@ const mergeHosts = (hostArrays: Host[][]): Host[] => {
     }
   }
   
-  // Convert map back to array and sort by IP address
   return Array.from(hostMap.values()).sort((a, b) => {
     const aSegments = a.ip.split('.').map(Number);
     const bSegments = b.ip.split('.').map(Number);
@@ -203,16 +186,13 @@ const mergeHosts = (hostArrays: Host[][]): Host[] => {
   });
 };
 
-// Merge and count occurrences of vulnerabilities
 const mergeAndCountVulnerabilities = (existingVulns: Vulnerability[], newVulns: Vulnerability[]): Vulnerability[] => {
   const vulnMap = new Map<string, Vulnerability>();
   
-  // Process existing vulnerabilities
   existingVulns.forEach(vuln => {
     vulnMap.set(vuln.pluginId, { ...vuln });
   });
   
-  // Merge and count new vulnerabilities
   newVulns.forEach(vuln => {
     if (vulnMap.has(vuln.pluginId)) {
       const existingVuln = vulnMap.get(vuln.pluginId)!;
@@ -223,18 +203,14 @@ const mergeAndCountVulnerabilities = (existingVulns: Vulnerability[], newVulns: 
     }
   });
   
-  // Convert map back to array and sort by occurrence count (descending)
   return Array.from(vulnMap.values()).sort((a, b) => {
-    // Sort by count first (higher count first)
     if ((b.count || 1) !== (a.count || 1)) {
       return (b.count || 1) - (a.count || 1);
     }
-    // If counts are equal, sort by CVSS score (higher score first)
     return parseFloat(b.cvss) - parseFloat(a.cvss);
   });
 };
 
-// Calculate total vulnerability counts by severity
 const calculateVulnerabilityTotals = (hosts: Host[]): Record<string, number> => {
   const totals = {
     critical: 0,
@@ -255,17 +231,64 @@ const calculateVulnerabilityTotals = (hosts: Host[]): Record<string, number> => 
   return totals;
 };
 
-// Process files and generate report
+const generateReportHeader = (companyDetails: CompanyDetails): string => {
+  return `
+    <html>
+    <head>
+    <style>
+      body { font-family: Arial, sans-serif; }
+      .header { 
+        background-color: #1A1F2C;
+        color: white;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+      }
+      .company-info {
+        margin-left: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+      }
+      th {
+        background-color: #8B5CF6;
+        color: white;
+        padding: 10px;
+        text-align: left;
+      }
+      td {
+        padding: 8px;
+        border: 1px solid #ddd;
+      }
+      .severity-critical { color: #ea384c; }
+      .severity-high { color: #f97316; }
+      .severity-medium { color: #eab308; }
+      .severity-low { color: #22c55e; }
+      .severity-info { color: #3b82f6; }
+    </style>
+    </head>
+    <body>
+      <div class="header">
+        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMxQTFGMkMiLz4KPHRleHQgeD0iNTAiIHk9IjUwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNDAiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBhbGlnbm1lbnQtYmFzZWxpbmU9Im1pZGRsZSI+JHtjb21wYW55RGV0YWlscy5jb21wYW55TmFtZS5jaGFyQXQoMCl9PC90ZXh0Pgo8L3N2Zz4=" width="100" height="100" />
+        <div class="company-info">
+          <h1>${companyDetails.companyName}</h1>
+          <p>Date: ${companyDetails.reportDate.toLocaleDateString()}</p>
+          <p>Prepared By: ${companyDetails.preparedBy}</p>
+        </div>
+      </div>
+  `;
+};
+
 export const generateReport = async (
   files: File[],
   companyDetails: CompanyDetails,
   onProgress?: (progress: number) => void
 ): Promise<Blob> => {
-  // Parse each file and update progress
-  const totalSteps = files.length + 3; // parsing + merging + sorting + generating
+  const totalSteps = files.length + 3;
   let completedSteps = 0;
   
-  // Step 1: Parse all files
   const parsedHostArrays: Host[][] = [];
   for (let i = 0; i < files.length; i++) {
     try {
@@ -277,104 +300,140 @@ export const generateReport = async (
       }
     } catch (error) {
       console.error(`Error processing file ${files[i].name}:`, error);
-      // Continue processing other files even if one fails
+      if (onProgress) {
+        onProgress(Math.floor((completedSteps / totalSteps) * 100));
+      }
     }
   }
   
-  // Step 2: Merge hosts from all files
   const mergedHosts = mergeHosts(parsedHostArrays);
   completedSteps++;
   if (onProgress) {
     onProgress(Math.floor((completedSteps / totalSteps) * 100));
   }
   
-  // Step 3: Final sorting and processing
   const vulnerabilityTotals = calculateVulnerabilityTotals(mergedHosts);
   completedSteps++;
   if (onProgress) {
     onProgress(Math.floor((completedSteps / totalSteps) * 100));
   }
   
-  // Step 4: Generate report content
-  // Generate the report content with formatted layout
-  let reportContent = `
-    NESSUS VULNERABILITY REPORT
-    
-    Company: ${companyDetails.companyName}
-    Date: ${companyDetails.reportDate.toLocaleDateString()}
-    Prepared By: ${companyDetails.preparedBy}
-    
-    EXECUTIVE SUMMARY:
-    =====================================================
-    Total Hosts Analyzed: ${mergedHosts.length}
-    Files Processed: ${files.map(file => file.name).join(', ')}
-    
-    VULNERABILITY SUMMARY:
-    - Critical Vulnerabilities: ${vulnerabilityTotals.critical}
-    - High Vulnerabilities: ${vulnerabilityTotals.high}
-    - Medium Vulnerabilities: ${vulnerabilityTotals.medium}
-    - Low Vulnerabilities: ${vulnerabilityTotals.low}
-    - Informational Findings: ${vulnerabilityTotals.info}
-    
-    DETAILED FINDINGS BY HOST:
-    =====================================================
-  `;
+  let reportContent = generateReportHeader(companyDetails);
   
-  // Add content for each host, prioritizing severity sequence
-  mergedHosts.forEach(host => {
-    reportContent += `\n\nHOST: ${host.ip} (${host.hostname})\n`;
-    reportContent += `=====================================================\n`;
-    
-    const categories = [
-      { title: 'CRITICAL VULNERABILITIES', vulns: host.vulnerabilities.critical },
-      { title: 'HIGH VULNERABILITIES', vulns: host.vulnerabilities.high },
-      { title: 'MEDIUM VULNERABILITIES', vulns: host.vulnerabilities.medium },
-      { title: 'LOW VULNERABILITIES', vulns: host.vulnerabilities.low },
-      { title: 'INFORMATIONAL FINDINGS', vulns: host.vulnerabilities.info }
-    ];
-    
-    // Process each category in severity order (Critical → High → Medium → Low → Info)
-    for (const category of categories) {
-      if (category.vulns.length > 0) {
-        reportContent += `\n${category.title} (${category.vulns.length}):\n`;
-        reportContent += `-----------------------------------------------------\n`;
-        
-        category.vulns.forEach(vuln => {
-          reportContent += `\n[${vuln.pluginId}] ${vuln.title}\n`;
-          reportContent += `CVSS: ${vuln.cvss}\n`;
-          if (vuln.count && vuln.count > 1) {
-            reportContent += `Occurrence Count: ${vuln.count} instances\n`;
-          }
-          reportContent += `Description: ${vuln.description}\n`;
-          reportContent += `Solution: ${vuln.solution}\n\n`;
-        });
-      }
-    }
-  });
-  
-  // Add remediation summary section
   reportContent += `
-    REMEDIATION RECOMMENDATIONS:
-    =====================================================
-    
-    HIGH PRIORITY:
-    - Address all Critical and High vulnerabilities immediately
-    - Focus on vulnerabilities with highest occurrence counts first
-    
-    MEDIUM PRIORITY:
-    - Schedule remediation for Medium vulnerabilities within 30 days
-    - Group similar vulnerabilities for efficient patching cycles
-    
-    LOW PRIORITY:
-    - Document Low and Informational findings
-    - Address during regular maintenance windows
+    <h2 style="color: #1A1F2C; margin-top: 30px;">EXECUTIVE SUMMARY</h2>
+    <table>
+      <tr>
+        <th>Category</th>
+        <th>Count</th>
+      </tr>
+      <tr>
+        <td>Total Hosts Analyzed</td>
+        <td>${mergedHosts.length}</td>
+      </tr>
+      <tr>
+        <td>Critical Vulnerabilities</td>
+        <td class="severity-critical">${vulnerabilityTotals.critical}</td>
+      </tr>
+      <tr>
+        <td>High Vulnerabilities</td>
+        <td class="severity-high">${vulnerabilityTotals.high}</td>
+      </tr>
+      <tr>
+        <td>Medium Vulnerabilities</td>
+        <td class="severity-medium">${vulnerabilityTotals.medium}</td>
+      </tr>
+      <tr>
+        <td>Low Vulnerabilities</td>
+        <td class="severity-low">${vulnerabilityTotals.low}</td>
+      </tr>
+      <tr>
+        <td>Informational Findings</td>
+        <td class="severity-info">${vulnerabilityTotals.info}</td>
+      </tr>
+    </table>
   `;
-  
+
+  mergedHosts.forEach(host => {
+    reportContent += `
+      <h2 style="color: #1A1F2C; margin-top: 30px;">HOST: ${host.ip} (${host.hostname})</h2>
+      
+      ${['critical', 'high', 'medium', 'low', 'info'].map(severity => {
+        const vulns = host.vulnerabilities[severity as keyof typeof host.vulnerabilities];
+        if (vulns.length === 0) return '';
+        
+        return `
+          <h3 class="severity-${severity}" style="margin-top: 20px;">
+            ${severity.toUpperCase()} VULNERABILITIES (${vulns.length})
+          </h3>
+          <table>
+            <tr>
+              <th>Plugin ID</th>
+              <th>Title</th>
+              <th>CVSS</th>
+              <th>Count</th>
+            </tr>
+            ${vulns.map(vuln => `
+              <tr>
+                <td>${vuln.pluginId}</td>
+                <td>
+                  <strong>${vuln.title}</strong>
+                  <p style="margin: 5px 0; color: #666;">${vuln.description}</p>
+                  <p style="margin: 5px 0; color: #444;"><strong>Solution:</strong> ${vuln.solution}</p>
+                </td>
+                <td>${vuln.cvss}</td>
+                <td>${vuln.count || 1}</td>
+              </tr>
+            `).join('')}
+          </table>
+        `;
+      }).join('')}
+    `;
+  });
+
+  reportContent += `
+    <h2 style="color: #1A1F2C; margin-top: 30px;">REMEDIATION RECOMMENDATIONS</h2>
+    <table>
+      <tr>
+        <th>Priority</th>
+        <th>Actions</th>
+      </tr>
+      <tr>
+        <td style="background-color: #fef2f2;">High Priority</td>
+        <td>
+          <ul>
+            <li>Address all Critical and High vulnerabilities immediately</li>
+            <li>Focus on vulnerabilities with highest occurrence counts first</li>
+          </ul>
+        </td>
+      </tr>
+      <tr>
+        <td style="background-color: #fffbeb;">Medium Priority</td>
+        <td>
+          <ul>
+            <li>Schedule remediation for Medium vulnerabilities within 30 days</li>
+            <li>Group similar vulnerabilities for efficient patching cycles</li>
+          </ul>
+        </td>
+      </tr>
+      <tr>
+        <td style="background-color: #f0fdf4;">Low Priority</td>
+        <td>
+          <ul>
+            <li>Document Low and Informational findings</li>
+            <li>Address during regular maintenance windows</li>
+          </ul>
+        </td>
+      </tr>
+    </table>
+    </body>
+    </html>
+  `;
+
   completedSteps++;
   if (onProgress) {
     onProgress(100);
   }
 
-  // Return a Word document-like format
   return new Blob([reportContent], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 };
