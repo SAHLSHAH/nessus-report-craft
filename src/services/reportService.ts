@@ -1,5 +1,7 @@
 
 import { CompanyDetails } from '@/components/CompanyDetailsForm';
+import { DOMParser } from '@xmldom/xmldom';
+import { XMLParser } from 'fast-xml-parser';
 
 interface Vulnerability {
   id: string;
@@ -24,55 +26,114 @@ interface Host {
   };
 }
 
-// Simulated function to parse a Nessus file
+// Function to parse a Nessus XML file
 const parseNessusFile = async (file: File): Promise<Host[]> => {
-  // In a real implementation, this would actually parse XML
-  // For demonstration, we'll simulate parsing with random data
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate parsing delay
-  
-  // Generate 1-3 random hosts per file
-  const hostCount = Math.floor(Math.random() * 3) + 1;
-  const hosts: Host[] = [];
-  
-  for (let i = 0; i < hostCount; i++) {
-    const ipSegments = [10, Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)];
-    const ip = ipSegments.join('.');
+  try {
+    const fileContent = await file.text();
     
-    hosts.push({
-      ip,
-      hostname: `host-${ip.replace(/\./g, '-')}.local`,
-      vulnerabilities: {
-        critical: generateRandomVulnerabilities('Critical', Math.floor(Math.random() * 3)),
-        high: generateRandomVulnerabilities('High', Math.floor(Math.random() * 5)),
-        medium: generateRandomVulnerabilities('Medium', Math.floor(Math.random() * 7)),
-        low: generateRandomVulnerabilities('Low', Math.floor(Math.random() * 10)),
-        info: generateRandomVulnerabilities('Info', Math.floor(Math.random() * 15)),
+    // Use fast-xml-parser for better performance
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_',
+    });
+    
+    const result = parser.parse(fileContent);
+    
+    // Extract NessusClientData_v2 element which contains the report
+    const nessusData = result?.NessusClientData_v2 || {};
+    const report = nessusData.Report || {};
+    
+    // ReportHost elements contain information about scanned hosts
+    const reportHosts = Array.isArray(report.ReportHost) 
+      ? report.ReportHost 
+      : report.ReportHost ? [report.ReportHost] : [];
+      
+    const hosts: Host[] = [];
+    
+    // Process each host in the Nessus report
+    for (const reportHost of reportHosts) {
+      const hostname = reportHost['@_name'] || '';
+      
+      // Find IP address from HostProperties
+      let ip = '';
+      const hostProperties = reportHost.HostProperties?.tag || [];
+      
+      if (Array.isArray(hostProperties)) {
+        const ipTag = hostProperties.find((tag: any) => tag['@_name'] === 'host-ip');
+        ip = ipTag?.['#text'] || hostname;
+      } else if (hostProperties && typeof hostProperties === 'object') {
+        ip = hostProperties['@_name'] === 'host-ip' ? hostProperties['#text'] : hostname;
       }
-    });
+      
+      // Process ReportItems which contain vulnerability information
+      const reportItems = Array.isArray(reportHost.ReportItem) 
+        ? reportHost.ReportItem 
+        : reportHost.ReportItem ? [reportHost.ReportItem] : [];
+        
+      const vulnerabilities: {
+        critical: Vulnerability[];
+        high: Vulnerability[];
+        medium: Vulnerability[];
+        low: Vulnerability[];
+        info: Vulnerability[];
+      } = {
+        critical: [],
+        high: [],
+        medium: [],
+        low: [],
+        info: []
+      };
+      
+      // Process each vulnerability for this host
+      for (const item of reportItems) {
+        // Map Nessus severity (0-4) to our categories
+        let severityCategory: 'Critical' | 'High' | 'Medium' | 'Low' | 'Info';
+        const severityValue = parseInt(item['@_severity'] || '0');
+        
+        switch (severityValue) {
+          case 4:
+            severityCategory = 'Critical';
+            break;
+          case 3:
+            severityCategory = 'High';
+            break;
+          case 2:
+            severityCategory = 'Medium';
+            break;
+          case 1:
+            severityCategory = 'Low';
+            break;
+          default:
+            severityCategory = 'Info';
+        }
+        
+        // Extract relevant vulnerability information
+        const vulnerability: Vulnerability = {
+          id: item['@_id'] || Math.random().toString(36).substring(2, 10),
+          pluginId: item['@_pluginID'] || '',
+          title: item['@_pluginName'] || 'Unknown Vulnerability',
+          severity: severityCategory,
+          description: item.description || 'No description provided',
+          solution: item.solution || 'No solution provided',
+          cvss: item.cvss_base_score || item.cvss_vector || '0.0',
+          count: 1
+        };
+        
+        vulnerabilities[severityCategory.toLowerCase() as keyof typeof vulnerabilities].push(vulnerability);
+      }
+      
+      hosts.push({
+        ip,
+        hostname,
+        vulnerabilities
+      });
+    }
+    
+    return hosts;
+  } catch (error) {
+    console.error('Error parsing Nessus file:', error);
+    throw new Error(`Failed to parse ${file.name}: ${error}`);
   }
-  
-  return hosts;
-};
-
-// Helper to generate mock vulnerability data
-const generateRandomVulnerabilities = (severity: 'Critical' | 'High' | 'Medium' | 'Low' | 'Info', count: number): Vulnerability[] => {
-  const vulnerabilities: Vulnerability[] = [];
-  
-  for (let i = 0; i < count; i++) {
-    const id = Math.random().toString(36).substring(2, 10);
-    vulnerabilities.push({
-      id,
-      pluginId: Math.floor(Math.random() * 100000).toString(),
-      title: `${severity} Vulnerability ${id}`,
-      severity,
-      description: `This is a sample ${severity.toLowerCase()} vulnerability that was detected.`,
-      solution: 'Update the affected software to the latest version.',
-      cvss: (Math.random() * 10).toFixed(1),
-      count: 1, // Initially found once
-    });
-  }
-  
-  return vulnerabilities;
 };
 
 // Merge hosts from multiple parsed files
@@ -194,7 +255,7 @@ const calculateVulnerabilityTotals = (hosts: Host[]): Record<string, number> => 
   return totals;
 };
 
-// Simulate file processing and report generation
+// Process files and generate report
 export const generateReport = async (
   files: File[],
   companyDetails: CompanyDetails,
@@ -207,16 +268,20 @@ export const generateReport = async (
   // Step 1: Parse all files
   const parsedHostArrays: Host[][] = [];
   for (let i = 0; i < files.length; i++) {
-    const parsedHosts = await parseNessusFile(files[i]);
-    parsedHostArrays.push(parsedHosts);
-    completedSteps++;
-    if (onProgress) {
-      onProgress(Math.floor((completedSteps / totalSteps) * 100));
+    try {
+      const parsedHosts = await parseNessusFile(files[i]);
+      parsedHostArrays.push(parsedHosts);
+      completedSteps++;
+      if (onProgress) {
+        onProgress(Math.floor((completedSteps / totalSteps) * 100));
+      }
+    } catch (error) {
+      console.error(`Error processing file ${files[i].name}:`, error);
+      // Continue processing other files even if one fails
     }
   }
   
   // Step 2: Merge hosts from all files
-  await new Promise(resolve => setTimeout(resolve, 800));
   const mergedHosts = mergeHosts(parsedHostArrays);
   completedSteps++;
   if (onProgress) {
@@ -224,7 +289,6 @@ export const generateReport = async (
   }
   
   // Step 3: Final sorting and processing
-  await new Promise(resolve => setTimeout(resolve, 700));
   const vulnerabilityTotals = calculateVulnerabilityTotals(mergedHosts);
   completedSteps++;
   if (onProgress) {
@@ -232,8 +296,6 @@ export const generateReport = async (
   }
   
   // Step 4: Generate report content
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
   // Generate the report content with formatted layout
   let reportContent = `
     NESSUS VULNERABILITY REPORT
@@ -313,6 +375,6 @@ export const generateReport = async (
     onProgress(100);
   }
 
-  // Return a Word document-like format (in real implementation, this would create an actual .docx file)
+  // Return a Word document-like format
   return new Blob([reportContent], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 };
