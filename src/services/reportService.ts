@@ -233,7 +233,7 @@ const calculateVulnerabilityTotals = (hosts: Host[]): Record<string, number> => 
 
 const generateVulnerabilitySection = (vuln: Vulnerability, index: number): string => {
   return `
-    <div class="vulnerability-section" style="page-break-before: always;">
+    <div class="vulnerability-section">
       <div class="vulnerability-table">
         <div class="vulnerability-header">
           <h2 class="vulnerability-title">${index + 1}. ${vuln.title}</h2>
@@ -241,10 +241,10 @@ const generateVulnerabilitySection = (vuln: Vulnerability, index: number): strin
         
         <div class="rating-row">
           <div class="rating-cell" style="background-color: ${getSeverityColor(vuln.severity)}">
-            Vulnerability Rating: ${vuln.severity}
-            ${vuln.count ? `<br>Occurrences: ${vuln.count}` : ''}
+            Risk Rating: ${vuln.severity}
+            ${vuln.count ? `<br>Total Occurrences: ${vuln.count}` : ''}
           </div>
-          <div class="cvss-cell">CVSS: ${vuln.cvss}</div>
+          <div class="cvss-cell">CVSS Score: ${vuln.cvss}</div>
         </div>
         
         <table width="100%">
@@ -257,18 +257,23 @@ const generateVulnerabilitySection = (vuln: Vulnerability, index: number): strin
             <td>${vuln.description}</td>
           </tr>
           <tr>
-            <td style="width: 30%; background-color: #f5f5f5;"><strong>Impact:</strong></td>
+            <td style="width: 30%; background-color: #f5f5f5;"><strong>Potential Impact:</strong></td>
             <td>
-              <ul style="list-style-type: disc; margin-left: 20px;">
-                <li>Data exposure risk</li>
-                <li>Security breach potential</li>
+              <ul class="recommendation-list">
+                <li>Unauthorized data access or manipulation</li>
+                <li>System compromise</li>
+                <li>Service disruption</li>
                 <li>Compliance violations</li>
               </ul>
             </td>
           </tr>
           <tr>
-            <td style="width: 30%; background-color: #f5f5f5;"><strong>Recommendation:</strong></td>
-            <td>${vuln.solution}</td>
+            <td style="width: 30%; background-color: #f5f5f5;"><strong>Remediation Steps:</strong></td>
+            <td>
+              <div class="recommendation-list">
+                ${vuln.solution}
+              </div>
+            </td>
           </tr>
         </table>
       </div>
@@ -302,97 +307,105 @@ const generateReportHeader = (companyDetails: CompanyDetails): string => {
       body { 
         font-family: Arial, sans-serif;
         line-height: 1.6;
-        color: #333;
+        color: #1A1F2C;
       }
       .header { 
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 20px;
-        border-bottom: 2px solid #000;
+        text-align: center;
+        padding: 40px 20px;
+        border-bottom: 3px solid #1A1F2C;
         margin-bottom: 40px;
-      }
-      .company-logo {
-        max-width: 200px;
-        max-height: 100px;
       }
       .vulnerability-section {
         page-break-before: always;
+        margin-top: 40px;
       }
       .vulnerability-table {
         width: 100%;
         border-collapse: collapse;
         margin: 20px 0;
-        border: 1px solid #000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
       .vulnerability-header {
         background-color: #f5f5f5;
-        padding: 10px;
-        border: 1px solid #000;
+        padding: 20px;
+        border-bottom: 2px solid #1A1F2C;
       }
       .vulnerability-title {
-        font-size: 18px;
+        font-size: 24px;
         margin: 0;
-        padding: 10px;
+        color: #1A1F2C;
       }
       .rating-row {
-        display: flex;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
       }
       .rating-cell {
         color: white;
-        padding: 12px;
-        width: 50%;
-        border: 1px solid #000;
+        padding: 15px;
+        font-weight: bold;
+        text-align: center;
       }
       .cvss-cell {
-        padding: 12px;
-        width: 50%;
-        border: 1px solid #000;
+        padding: 15px;
         background-color: #f5f5f5;
+        text-align: center;
+        font-weight: bold;
       }
       td {
-        padding: 12px;
-        border: 1px solid #000;
+        padding: 15px;
+        border: 1px solid #ddd;
       }
       .severity-group {
         page-break-before: always;
       }
       .severity-header {
-        font-size: 24px;
-        color: #333;
-        margin: 30px 0;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #000;
+        font-size: 28px;
+        color: #1A1F2C;
+        margin: 40px 0;
+        padding: 20px;
+        background-color: #f5f5f5;
+        border-left: 5px solid #1A1F2C;
       }
       .executive-summary {
-        margin-bottom: 40px;
+        margin: 40px 0;
+        padding: 30px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
       }
       .summary-table {
         width: 100%;
         border-collapse: collapse;
         margin: 20px 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
       .summary-table th,
       .summary-table td {
-        padding: 12px;
-        border: 1px solid #000;
+        padding: 15px;
+        border: 1px solid #ddd;
+        text-align: left;
       }
       .summary-table th {
         background-color: #f5f5f5;
+        font-weight: bold;
+      }
+      .recommendation-list {
+        margin: 15px 0;
+        padding-left: 20px;
+      }
+      .recommendation-list li {
+        margin-bottom: 10px;
+        line-height: 1.6;
       }
     </style>
     </head>
     <body>
       <div class="header">
-        ${companyDetails.companyLogo ? 
-          `<img src="${companyDetails.companyLogo}" alt="Company Logo" class="company-logo" />` :
-          ''
-        }
-        <div>
-          <h1>${companyDetails.companyName}</h1>
-          <p>Date: ${companyDetails.reportDate.toLocaleDateString()}</p>
-          <p>Prepared By: ${companyDetails.preparedBy}</p>
-        </div>
+        <h1 style="font-size: 32px; margin-bottom: 10px;">${companyDetails.companyName}</h1>
+        <h2 style="font-size: 24px; color: #666;">Vulnerability Assessment Report</h2>
+        <p style="margin-top: 20px; color: #666;">
+          Date: ${companyDetails.reportDate.toLocaleDateString()}<br>
+          Prepared By: ${companyDetails.preparedBy}
+        </p>
       </div>
   `;
 };
