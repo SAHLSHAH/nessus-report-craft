@@ -19,11 +19,21 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const formSchema = z.object({
   companyName: z.string().min(1, { message: "Company name is required" }),
   reportDate: z.date({ required_error: "Report date is required" }),
   preparedBy: z.string().min(1, { message: "Preparer name is required" }),
+  template: z.enum(["simple", "professional", "executive"], {
+    required_error: "Please select a template",
+  }),
 });
 
 export type CompanyDetails = z.infer<typeof formSchema>;
@@ -43,6 +53,7 @@ const CompanyDetailsForm: React.FC<CompanyDetailsFormProps> = ({
       companyName: "",
       reportDate: new Date(),
       preparedBy: "",
+      template: "professional",
     },
   });
 
@@ -117,6 +128,33 @@ const CompanyDetailsForm: React.FC<CompanyDetailsFormProps> = ({
               <FormControl>
                 <Input placeholder="John Doe" {...field} disabled={isDisabled} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="template"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Report Template</FormLabel>
+              <Select 
+                onValueChange={field.onChange} 
+                defaultValue={field.value}
+                disabled={isDisabled}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a template" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="simple">Simple Template</SelectItem>
+                  <SelectItem value="professional">Professional Template</SelectItem>
+                  <SelectItem value="executive">Executive Template</SelectItem>
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
