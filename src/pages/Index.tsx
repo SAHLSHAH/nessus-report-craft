@@ -1,8 +1,10 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
 import Header from '@/components/Header';
 import FileUpload from '@/components/FileUpload';
@@ -16,6 +18,7 @@ import { generateReport } from '@/services/reportService';
 type AppState = 'idle' | 'generating' | 'success' | 'error';
 
 const Index = () => {
+  const navigate = useNavigate();
   const [files, setFiles] = useState<File[]>([]);
   const [appState, setAppState] = useState<AppState>('idle');
   const [reportBlob, setReportBlob] = useState<Blob | null>(null);
@@ -89,8 +92,16 @@ const Index = () => {
       <Header />
       
       <main className="container mx-auto py-8 px-4 flex-grow">
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/')} 
+          className="mb-6"
+        >
+          <ArrowLeft className="mr-2" />
+          Back to Home
+        </Button>
+
         <div className="grid md:grid-cols-3 gap-8">
-          {/* Left Column - File Upload */}
           <div className="md:col-span-2">
             <Card>
               <CardContent className="p-6">
@@ -100,7 +111,6 @@ const Index = () => {
             </Card>
           </div>
 
-          {/* Right Column - Company Details Form */}
           <div>
             <Card>
               <CardContent className="p-6">
@@ -119,7 +129,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Report Generation Section */}
         <div className="mt-8">
           <Card className="shadow-md">
             <CardContent className="p-6">

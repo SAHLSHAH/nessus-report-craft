@@ -1,4 +1,3 @@
-
 import { CompanyDetails } from '@/components/CompanyDetailsForm';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -234,7 +233,7 @@ const calculateVulnerabilityTotals = (hosts: Host[]): Record<string, number> => 
 
 const generateVulnerabilitySection = (vuln: Vulnerability, index: number): string => {
   return `
-    <div class="vulnerability-section">
+    <div class="vulnerability-section" style="page-break-before: always;">
       <div class="vulnerability-header">
         <h2 class="vulnerability-title">${index + 1}. ${vuln.title}</h2>
       </div>
@@ -280,29 +279,21 @@ const generateVulnerabilitySection = (vuln: Vulnerability, index: number): strin
   `;
 };
 
-// Format description text for better readability
 const formatDescription = (description: string): string => {
   if (!description) return 'No description available';
   
-  // Replace multiple newlines with paragraph breaks
-  const formatted = description
+  return description
     .replace(/\n{2,}/g, '</p><p>')
     .replace(/\n/g, '<br>')
     .replace(/Plugin Output :/g, '<strong>Plugin Output:</strong>');
-    
-  return `<p>${formatted}</p>`;
 };
 
-// Format solution text for better readability
 const formatSolution = (solution: string): string => {
   if (!solution) return 'No remediation steps available';
   
-  // Replace multiple newlines with paragraph breaks
-  const formatted = solution
+  return solution
     .replace(/\n{2,}/g, '</p><p>')
     .replace(/\n/g, '<br>');
-    
-  return `<p>${formatted}</p>`;
 };
 
 const getSeverityColor = (severity: string): string => {
@@ -388,9 +379,10 @@ const generateReportHeader = (companyDetails: CompanyDetails): string => {
         padding-bottom: 10px;
       }
       .vulnerability-section {
-        page-break-before: always;
         margin-top: 20px;
         margin-bottom: 30px;
+        page-break-before: always;
+        page-break-after: always;
       }
       .vulnerability-header {
         background-color: #f5f5f5;
@@ -607,7 +599,6 @@ const generateExecutiveSummary = (
   vulnerabilityTotals: Record<string, number>,
   totalHosts: number
 ): string => {
-  // Calculate total vulnerabilities
   const totalVulnerabilities = 
     vulnerabilityTotals.critical +
     vulnerabilityTotals.high +
@@ -615,7 +606,6 @@ const generateExecutiveSummary = (
     vulnerabilityTotals.low +
     vulnerabilityTotals.info;
 
-  // Calculate risk rating based on findings
   let riskRating = "Low";
   if (vulnerabilityTotals.critical > 0) {
     riskRating = "Critical";
@@ -787,29 +777,22 @@ export const generateReport = async (
     onProgress(Math.floor((completedSteps / totalSteps) * 100));
   }
   
-  // Start building the report
   let reportContent = generateReportHeader(companyDetails);
   
-  // Add table of contents
   reportContent += generateTableOfContents(vulnerabilityTotals, mergedHosts.length);
   
-  // Add executive summary and overview
   reportContent += generateExecutiveSummary(vulnerabilityTotals, mergedHosts.length);
   
-  // Now add each vulnerability section by severity
   const severityOrder = ['critical', 'high', 'medium', 'low', 'info'];
-  let currentSectionNumber = 4; // Starting from 4 after executive summary, scope and findings overview
+  let currentSectionNumber = 4;
   let globalIndex = 1;
 
   severityOrder.forEach(severity => {
-    // Collect all vulnerabilities of this severity from all hosts
     const allVulnsOfSeverity = mergedHosts.flatMap(host => 
       host.vulnerabilities[severity as keyof typeof host.vulnerabilities]
     );
 
-    // If we have vulnerabilities of this severity
     if (allVulnsOfSeverity.length > 0) {
-      // Add severity section header
       reportContent += `
         <div class="severity-group">
           <h2 class="severity-header" style="background-color: ${getSeverityColor(severity)};">
@@ -818,7 +801,6 @@ export const generateReport = async (
           <p>The following ${allVulnsOfSeverity.length} ${severity} severity vulnerabilities were identified during the assessment:</p>
       `;
 
-      // Add each vulnerability in this severity level
       allVulnsOfSeverity.forEach((vuln, index) => {
         reportContent += generateVulnerabilitySection(vuln, globalIndex);
         globalIndex++;
@@ -829,7 +811,6 @@ export const generateReport = async (
     }
   });
 
-  // Add appendix
   reportContent += `
     <div class="severity-group">
       <h2 class="section-title">${currentSectionNumber}. Appendix</h2>
@@ -873,7 +854,6 @@ export const generateReport = async (
     </div>
   `;
 
-  // Close the document
   reportContent += `
     <div class="footer">
       <p>Vulnerability Assessment Report - ${companyDetails.companyName} - ${companyDetails.reportDate.toLocaleDateString()}</p>
