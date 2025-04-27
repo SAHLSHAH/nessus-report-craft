@@ -1,3 +1,4 @@
+
 import { CompanyDetails } from '@/components/CompanyDetailsForm';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -234,51 +235,74 @@ const calculateVulnerabilityTotals = (hosts: Host[]): Record<string, number> => 
 const generateVulnerabilitySection = (vuln: Vulnerability, index: number): string => {
   return `
     <div class="vulnerability-section">
-      <div class="vulnerability-table">
-        <div class="vulnerability-header">
-          <h2 class="vulnerability-title">${index + 1}. ${vuln.title}</h2>
-        </div>
-        
-        <div class="rating-row">
-          <div class="rating-cell" style="background-color: ${getSeverityColor(vuln.severity)}">
-            Risk Rating: ${vuln.severity}
-            ${vuln.count ? `<br>Total Occurrences: ${vuln.count}` : ''}
-          </div>
-          <div class="cvss-cell">CVSS Score: ${vuln.cvss}</div>
-        </div>
-        
-        <table width="100%">
-          <tr>
-            <td style="width: 30%; background-color: #f5f5f5;"><strong>Plugin ID:</strong></td>
-            <td>${vuln.pluginId}</td>
-          </tr>
-          <tr>
-            <td style="width: 30%; background-color: #f5f5f5;"><strong>Description:</strong></td>
-            <td>${vuln.description}</td>
-          </tr>
-          <tr>
-            <td style="width: 30%; background-color: #f5f5f5;"><strong>Potential Impact:</strong></td>
-            <td>
-              <ul class="recommendation-list">
-                <li>Unauthorized data access or manipulation</li>
-                <li>System compromise</li>
-                <li>Service disruption</li>
-                <li>Compliance violations</li>
-              </ul>
-            </td>
-          </tr>
-          <tr>
-            <td style="width: 30%; background-color: #f5f5f5;"><strong>Remediation Steps:</strong></td>
-            <td>
-              <div class="recommendation-list">
-                ${vuln.solution}
-              </div>
-            </td>
-          </tr>
-        </table>
+      <div class="vulnerability-header">
+        <h2 class="vulnerability-title">${index + 1}. ${vuln.title}</h2>
       </div>
+      
+      <div class="rating-row">
+        <div class="rating-cell" style="background-color: ${getSeverityColor(vuln.severity)}">
+          <strong>Risk Rating:</strong> ${vuln.severity}
+          ${vuln.count && vuln.count > 1 ? `<br>Total Occurrences: ${vuln.count}` : ''}
+        </div>
+        <div class="cvss-cell"><strong>CVSS Score:</strong> ${vuln.cvss}</div>
+      </div>
+      
+      <table class="details-table" width="100%">
+        <tr>
+          <td class="label-cell"><strong>Plugin ID:</strong></td>
+          <td>${vuln.pluginId}</td>
+        </tr>
+        <tr>
+          <td class="label-cell"><strong>Description:</strong></td>
+          <td>${formatDescription(vuln.description)}</td>
+        </tr>
+        <tr>
+          <td class="label-cell"><strong>Potential Impact:</strong></td>
+          <td>
+            <ul class="impact-list">
+              <li>Unauthorized data access or manipulation</li>
+              <li>System compromise</li>
+              <li>Service disruption</li>
+              <li>Compliance violations</li>
+            </ul>
+          </td>
+        </tr>
+        <tr>
+          <td class="label-cell"><strong>Remediation Steps:</strong></td>
+          <td>
+            <div class="recommendation-content">
+              ${formatSolution(vuln.solution)}
+            </div>
+          </td>
+        </tr>
+      </table>
     </div>
   `;
+};
+
+// Format description text for better readability
+const formatDescription = (description: string): string => {
+  if (!description) return 'No description available';
+  
+  // Replace multiple newlines with paragraph breaks
+  const formatted = description
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g, '<br>')
+    .replace(/Plugin Output :/g, '<strong>Plugin Output:</strong>');
+    
+  return `<p>${formatted}</p>`;
+};
+
+// Format solution text for better readability
+const formatSolution = (solution: string): string => {
+  if (!solution) return 'No remediation steps available';
+  
+  // Replace multiple newlines with paragraph breaks
+  const formatted = solution
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+    
+  return `<p>${formatted}</p>`;
 };
 
 const getSeverityColor = (severity: string): string => {
@@ -297,80 +321,128 @@ const getSeverityColor = (severity: string): string => {
 };
 
 const generateReportHeader = (companyDetails: CompanyDetails): string => {
+  const templateClass = companyDetails.template || 'professional';
+  
   return `
     <html>
     <head>
     <style>
       @page {
         margin: 2cm;
+        size: A4 portrait;
       }
       body { 
-        font-family: Arial, sans-serif;
+        font-family: Calibri, Arial, sans-serif;
         line-height: 1.6;
         color: #1A1F2C;
+        margin: 0;
+        padding: 0;
+        counter-reset: page;
       }
       .header { 
         text-align: center;
         padding: 40px 20px;
         border-bottom: 3px solid #1A1F2C;
         margin-bottom: 40px;
+        page-break-after: always;
+      }
+      .cover-title {
+        font-size: 36px;
+        color: #1A1F2C;
+        margin-bottom: 20px;
+      }
+      .cover-subtitle {
+        font-size: 24px;
+        color: #666;
+        margin-bottom: 40px;
+      }
+      .cover-details {
+        margin-top: 60px;
+        font-size: 16px;
+        color: #666;
+      }
+      .toc {
+        page-break-after: always;
+      }
+      .toc-title {
+        font-size: 24px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #1A1F2C;
+        padding-bottom: 10px;
+      }
+      .toc-item {
+        margin: 10px 0;
+        display: flex;
+        justify-content: space-between;
+      }
+      .toc-number {
+        font-weight: bold;
+      }
+      .executive-summary {
+        page-break-after: always;
+      }
+      .section-title {
+        font-size: 24px;
+        margin: 40px 0 20px;
+        border-bottom: 2px solid #1A1F2C;
+        padding-bottom: 10px;
       }
       .vulnerability-section {
         page-break-before: always;
-        margin-top: 40px;
-      }
-      .vulnerability-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 20px 0;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+        margin-bottom: 30px;
       }
       .vulnerability-header {
         background-color: #f5f5f5;
-        padding: 20px;
+        padding: 15px;
         border-bottom: 2px solid #1A1F2C;
+        margin-bottom: 0;
       }
       .vulnerability-title {
-        font-size: 24px;
+        font-size: 20px;
         margin: 0;
         color: #1A1F2C;
       }
       .rating-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
+        margin-bottom: 0;
       }
       .rating-cell {
         color: white;
         padding: 15px;
-        font-weight: bold;
-        text-align: center;
+        font-weight: normal;
+        text-align: left;
       }
       .cvss-cell {
         padding: 15px;
         background-color: #f5f5f5;
-        text-align: center;
-        font-weight: bold;
+        text-align: left;
+        font-weight: normal;
       }
-      td {
-        padding: 15px;
+      .details-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0;
+      }
+      .details-table td {
+        padding: 12px 15px;
         border: 1px solid #ddd;
+        vertical-align: top;
+      }
+      .label-cell {
+        width: 25%;
+        background-color: #f5f5f5;
       }
       .severity-group {
         page-break-before: always;
       }
       .severity-header {
         font-size: 28px;
-        color: #1A1F2C;
-        margin: 40px 0;
-        padding: 20px;
-        background-color: #f5f5f5;
-        border-left: 5px solid #1A1F2C;
-      }
-      .executive-summary {
-        margin: 40px 0;
-        padding: 30px;
-        background-color: #f8f9fa;
-        border-radius: 8px;
+        color: #fff;
+        margin: 0;
+        padding: 15px;
+        background-color: #1A1F2C;
       }
       .summary-table {
         width: 100%;
@@ -380,7 +452,7 @@ const generateReportHeader = (companyDetails: CompanyDetails): string => {
       }
       .summary-table th,
       .summary-table td {
-        padding: 15px;
+        padding: 12px 15px;
         border: 1px solid #ddd;
         text-align: left;
       }
@@ -388,25 +460,293 @@ const generateReportHeader = (companyDetails: CompanyDetails): string => {
         background-color: #f5f5f5;
         font-weight: bold;
       }
-      .recommendation-list {
-        margin: 15px 0;
+      .impact-list {
+        margin: 10px 0;
         padding-left: 20px;
       }
-      .recommendation-list li {
-        margin-bottom: 10px;
-        line-height: 1.6;
+      .impact-list li {
+        margin-bottom: 8px;
+      }
+      .recommendation-content p {
+        margin: 10px 0;
+      }
+      p {
+        margin: 10px 0;
+      }
+      .page-number:after {
+        content: counter(page);
+        counter-increment: page;
+      }
+      .footer {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        text-align: center;
+        font-size: 10px;
+        color: #666;
+      }
+      
+      /* Template-specific styles */
+      .simple .header {
+        background-color: #f5f5f5;
+        border-bottom: 1px solid #ddd;
+      }
+      .simple .section-title {
+        border-bottom: 1px solid #ddd;
+      }
+      .simple .vulnerability-header {
+        background-color: #f9f9f9;
+      }
+      
+      .professional .header {
+        background: linear-gradient(to right, #f5f5f5, #fff);
+        border-bottom: 3px solid #1A1F2C;
+      }
+      .professional .section-title {
+        color: #1A1F2C;
+        border-left: 5px solid #1A1F2C;
+        padding-left: 10px;
+      }
+      
+      .executive .header {
+        background-color: #1A1F2C;
+        color: white;
+      }
+      .executive .cover-title,
+      .executive .cover-subtitle {
+        color: white;
+      }
+      .executive .section-title {
+        background-color: #1A1F2C;
+        color: white;
+        padding: 10px;
+        border: none;
       }
     </style>
     </head>
-    <body>
+    <body class="${templateClass}">
       <div class="header">
-        <h1 style="font-size: 32px; margin-bottom: 10px;">${companyDetails.companyName}</h1>
-        <h2 style="font-size: 24px; color: #666;">Vulnerability Assessment Report</h2>
-        <p style="margin-top: 20px; color: #666;">
-          Date: ${companyDetails.reportDate.toLocaleDateString()}<br>
-          Prepared By: ${companyDetails.preparedBy}
-        </p>
+        <h1 class="cover-title">${companyDetails.companyName}</h1>
+        <h2 class="cover-subtitle">Vulnerability Assessment Report</h2>
+        <div class="cover-details">
+          <p>Date: ${companyDetails.reportDate.toLocaleDateString()}</p>
+          <p>Prepared By: ${companyDetails.preparedBy}</p>
+        </div>
       </div>
+  `;
+};
+
+const generateTableOfContents = (
+  vulnerabilityTotals: Record<string, number>,
+  totalHosts: number
+): string => {
+  return `
+    <div class="toc">
+      <h2 class="toc-title">Table of Contents</h2>
+      
+      <div class="toc-item">
+        <span>1. Executive Summary</span>
+        <span class="toc-number">1</span>
+      </div>
+      <div class="toc-item">
+        <span>2. Scope of Assessment</span>
+        <span class="toc-number">2</span>
+      </div>
+      <div class="toc-item">
+        <span>3. Findings Overview</span>
+        <span class="toc-number">2</span>
+      </div>
+      
+      ${vulnerabilityTotals.critical > 0 ? `
+      <div class="toc-item">
+        <span>4. Critical Vulnerabilities</span>
+        <span class="toc-number">3</span>
+      </div>
+      ` : ''}
+      
+      ${vulnerabilityTotals.high > 0 ? `
+      <div class="toc-item">
+        <span>${vulnerabilityTotals.critical > 0 ? '5' : '4'}. High Vulnerabilities</span>
+        <span class="toc-number">${vulnerabilityTotals.critical > 0 ? '4' : '3'}</span>
+      </div>
+      ` : ''}
+      
+      ${vulnerabilityTotals.medium > 0 ? `
+      <div class="toc-item">
+        <span>${(vulnerabilityTotals.critical > 0 ? 5 : 4) + (vulnerabilityTotals.high > 0 ? 1 : 0)}. Medium Vulnerabilities</span>
+        <span class="toc-number">${(vulnerabilityTotals.critical > 0 ? 4 : 3) + (vulnerabilityTotals.high > 0 ? 1 : 0)}</span>
+      </div>
+      ` : ''}
+      
+      ${vulnerabilityTotals.low > 0 ? `
+      <div class="toc-item">
+        <span>${(vulnerabilityTotals.critical > 0 ? 5 : 4) + 
+                (vulnerabilityTotals.high > 0 ? 1 : 0) + 
+                (vulnerabilityTotals.medium > 0 ? 1 : 0)}. Low Vulnerabilities</span>
+        <span class="toc-number">${(vulnerabilityTotals.critical > 0 ? 4 : 3) + 
+                                  (vulnerabilityTotals.high > 0 ? 1 : 0) + 
+                                  (vulnerabilityTotals.medium > 0 ? 1 : 0)}</span>
+      </div>
+      ` : ''}
+      
+      <div class="toc-item">
+        <span>${(vulnerabilityTotals.critical > 0 ? 5 : 4) + 
+                (vulnerabilityTotals.high > 0 ? 1 : 0) + 
+                (vulnerabilityTotals.medium > 0 ? 1 : 0) + 
+                (vulnerabilityTotals.low > 0 ? 1 : 0) + 1}. Appendix</span>
+        <span class="toc-number">${(vulnerabilityTotals.critical > 0 ? 4 : 3) + 
+                                  (vulnerabilityTotals.high > 0 ? 1 : 0) + 
+                                  (vulnerabilityTotals.medium > 0 ? 1 : 0) + 
+                                  (vulnerabilityTotals.low > 0 ? 1 : 0) + 1}</span>
+      </div>
+    </div>
+  `;
+};
+
+const generateExecutiveSummary = (
+  vulnerabilityTotals: Record<string, number>,
+  totalHosts: number
+): string => {
+  // Calculate total vulnerabilities
+  const totalVulnerabilities = 
+    vulnerabilityTotals.critical +
+    vulnerabilityTotals.high +
+    vulnerabilityTotals.medium +
+    vulnerabilityTotals.low +
+    vulnerabilityTotals.info;
+
+  // Calculate risk rating based on findings
+  let riskRating = "Low";
+  if (vulnerabilityTotals.critical > 0) {
+    riskRating = "Critical";
+  } else if (vulnerabilityTotals.high > 0) {
+    riskRating = "High";
+  } else if (vulnerabilityTotals.medium > 0) {
+    riskRating = "Medium";
+  }
+
+  return `
+    <div class="executive-summary">
+      <h2 class="section-title">1. Executive Summary</h2>
+      
+      <p>This vulnerability assessment report presents the findings from a comprehensive security scan performed on ${totalHosts} host${totalHosts !== 1 ? 's' : ''}. The assessment identified a total of ${totalVulnerabilities} vulnerabilities of varying severity levels.</p>
+      
+      <p>Based on the findings, the overall security risk rating is <strong>${riskRating}</strong>.</p>
+      
+      <h3>Key Findings</h3>
+      
+      <table class="summary-table">
+        <tr>
+          <th>Severity</th>
+          <th>Count</th>
+          <th>Risk Level</th>
+        </tr>
+        <tr style="background-color: rgba(234, 56, 76, 0.1);">
+          <td><span style="color: #ea384c; font-weight: bold;">Critical</span></td>
+          <td>${vulnerabilityTotals.critical}</td>
+          <td>Immediate attention required</td>
+        </tr>
+        <tr style="background-color: rgba(249, 115, 22, 0.1);">
+          <td><span style="color: #f97316; font-weight: bold;">High</span></td>
+          <td>${vulnerabilityTotals.high}</td>
+          <td>Remediate within 30 days</td>
+        </tr>
+        <tr style="background-color: rgba(234, 179, 8, 0.1);">
+          <td><span style="color: #eab308; font-weight: bold;">Medium</span></td>
+          <td>${vulnerabilityTotals.medium}</td>
+          <td>Remediate within 90 days</td>
+        </tr>
+        <tr style="background-color: rgba(34, 197, 94, 0.1);">
+          <td><span style="color: #22c55e; font-weight: bold;">Low</span></td>
+          <td>${vulnerabilityTotals.low}</td>
+          <td>Address during regular maintenance</td>
+        </tr>
+        <tr style="background-color: rgba(59, 130, 246, 0.1);">
+          <td><span style="color: #3b82f6; font-weight: bold;">Informational</span></td>
+          <td>${vulnerabilityTotals.info}</td>
+          <td>Awareness only</td>
+        </tr>
+      </table>
+      
+      <p>The findings in this report outline security vulnerabilities that could potentially be exploited by malicious actors to compromise the confidentiality, integrity, or availability of your systems and data. We recommend addressing the identified issues according to their severity level.</p>
+    </div>
+    
+    <div class="scope-section">
+      <h2 class="section-title">2. Scope of Assessment</h2>
+      
+      <p>This vulnerability assessment covered a total of ${totalHosts} host${totalHosts !== 1 ? 's' : ''}. The assessment was conducted using automated scanning tools to identify security vulnerabilities, misconfigurations, and outdated software that could potentially be exploited by attackers.</p>
+      
+      <table class="summary-table">
+        <tr>
+          <th>Assessment Type</th>
+          <th>Details</th>
+        </tr>
+        <tr>
+          <td>Assessment Method</td>
+          <td>Automated vulnerability scanning</td>
+        </tr>
+        <tr>
+          <td>Total Hosts Scanned</td>
+          <td>${totalHosts}</td>
+        </tr>
+        <tr>
+          <td>Tools Used</td>
+          <td>Nessus Vulnerability Scanner</td>
+        </tr>
+      </table>
+    </div>
+    
+    <div class="findings-overview">
+      <h2 class="section-title">3. Findings Overview</h2>
+      
+      <p>The following chart provides a visual representation of the vulnerabilities discovered during the assessment:</p>
+      
+      <div style="text-align: center; margin: 20px 0;">
+        <table class="summary-table" style="width: 80%; margin: 0 auto;">
+          <tr>
+            <th style="width: 30%;">Severity</th>
+            <th>Distribution</th>
+          </tr>
+          <tr>
+            <td style="color: #ea384c; font-weight: bold;">Critical</td>
+            <td>
+              <div style="background-color: #ea384c; width: ${Math.min(100, (vulnerabilityTotals.critical / totalVulnerabilities) * 100)}%; height: 20px; display: inline-block;"></div>
+              <span style="margin-left: 10px;">${vulnerabilityTotals.critical} (${Math.round((vulnerabilityTotals.critical / totalVulnerabilities) * 100)}%)</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="color: #f97316; font-weight: bold;">High</td>
+            <td>
+              <div style="background-color: #f97316; width: ${Math.min(100, (vulnerabilityTotals.high / totalVulnerabilities) * 100)}%; height: 20px; display: inline-block;"></div>
+              <span style="margin-left: 10px;">${vulnerabilityTotals.high} (${Math.round((vulnerabilityTotals.high / totalVulnerabilities) * 100)}%)</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="color: #eab308; font-weight: bold;">Medium</td>
+            <td>
+              <div style="background-color: #eab308; width: ${Math.min(100, (vulnerabilityTotals.medium / totalVulnerabilities) * 100)}%; height: 20px; display: inline-block;"></div>
+              <span style="margin-left: 10px;">${vulnerabilityTotals.medium} (${Math.round((vulnerabilityTotals.medium / totalVulnerabilities) * 100)}%)</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="color: #22c55e; font-weight: bold;">Low</td>
+            <td>
+              <div style="background-color: #22c55e; width: ${Math.min(100, (vulnerabilityTotals.low / totalVulnerabilities) * 100)}%; height: 20px; display: inline-block;"></div>
+              <span style="margin-left: 10px;">${vulnerabilityTotals.low} (${Math.round((vulnerabilityTotals.low / totalVulnerabilities) * 100)}%)</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="color: #3b82f6; font-weight: bold;">Info</td>
+            <td>
+              <div style="background-color: #3b82f6; width: ${Math.min(100, (vulnerabilityTotals.info / totalVulnerabilities) * 100)}%; height: 20px; display: inline-block;"></div>
+              <span style="margin-left: 10px;">${vulnerabilityTotals.info} (${Math.round((vulnerabilityTotals.info / totalVulnerabilities) * 100)}%)</span>
+            </td>
+          </tr>
+        </table>
+      </div>
+      
+      <p>Each vulnerability has been analyzed and documented with details on its impact, potential exploitation scenarios, and recommended remediation steps. The following sections provide detailed information on the identified vulnerabilities grouped by severity level.</p>
+    </div>
   `;
 };
 
@@ -447,68 +787,101 @@ export const generateReport = async (
     onProgress(Math.floor((completedSteps / totalSteps) * 100));
   }
   
+  // Start building the report
   let reportContent = generateReportHeader(companyDetails);
   
-  reportContent += `
-    <div class="executive-summary">
-      <h2 style="color: #1A1F2C;">EXECUTIVE SUMMARY</h2>
-      <table class="summary-table">
-        <tr>
-          <th>Category</th>
-          <th>Count</th>
-        </tr>
-        <tr>
-          <td>Total Hosts Analyzed</td>
-          <td>${mergedHosts.length}</td>
-        </tr>
-        <tr style="background-color: #ea384c; color: white;">
-          <td>Critical Vulnerabilities</td>
-          <td>${vulnerabilityTotals.critical}</td>
-        </tr>
-        <tr style="background-color: #f97316; color: white;">
-          <td>High Vulnerabilities</td>
-          <td>${vulnerabilityTotals.high}</td>
-        </tr>
-        <tr style="background-color: #eab308; color: white;">
-          <td>Medium Vulnerabilities</td>
-          <td>${vulnerabilityTotals.medium}</td>
-        </tr>
-        <tr style="background-color: #22c55e; color: white;">
-          <td>Low Vulnerabilities</td>
-          <td>${vulnerabilityTotals.low}</td>
-        </tr>
-        <tr style="background-color: #3b82f6; color: white;">
-          <td>Informational Findings</td>
-          <td>${vulnerabilityTotals.info}</td>
-        </tr>
-      </table>
-    </div>
-  `;
-
+  // Add table of contents
+  reportContent += generateTableOfContents(vulnerabilityTotals, mergedHosts.length);
+  
+  // Add executive summary and overview
+  reportContent += generateExecutiveSummary(vulnerabilityTotals, mergedHosts.length);
+  
+  // Now add each vulnerability section by severity
   const severityOrder = ['critical', 'high', 'medium', 'low', 'info'];
+  let currentSectionNumber = 4; // Starting from 4 after executive summary, scope and findings overview
   let globalIndex = 1;
 
   severityOrder.forEach(severity => {
-    const severityVulns = mergedHosts.flatMap(host => 
+    // Collect all vulnerabilities of this severity from all hosts
+    const allVulnsOfSeverity = mergedHosts.flatMap(host => 
       host.vulnerabilities[severity as keyof typeof host.vulnerabilities]
     );
 
-    if (severityVulns.length > 0) {
+    // If we have vulnerabilities of this severity
+    if (allVulnsOfSeverity.length > 0) {
+      // Add severity section header
       reportContent += `
         <div class="severity-group">
-          <h2 class="severity-header">${severity.toUpperCase()} Severity Vulnerabilities</h2>
+          <h2 class="severity-header" style="background-color: ${getSeverityColor(severity)};">
+            ${currentSectionNumber}. ${severity.charAt(0).toUpperCase() + severity.slice(1)} Severity Vulnerabilities
+          </h2>
+          <p>The following ${allVulnsOfSeverity.length} ${severity} severity vulnerabilities were identified during the assessment:</p>
       `;
 
-      severityVulns.forEach(vuln => {
+      // Add each vulnerability in this severity level
+      allVulnsOfSeverity.forEach((vuln, index) => {
         reportContent += generateVulnerabilitySection(vuln, globalIndex);
         globalIndex++;
       });
 
       reportContent += '</div>';
+      currentSectionNumber++;
     }
   });
 
-  reportContent += '</body></html>';
+  // Add appendix
+  reportContent += `
+    <div class="severity-group">
+      <h2 class="section-title">${currentSectionNumber}. Appendix</h2>
+      
+      <h3>A. Assessment Methodology</h3>
+      <p>The vulnerability assessment was conducted using automated scanning tools to identify security vulnerabilities, misconfigurations, and outdated software. The assessment followed industry-standard methodologies for vulnerability identification and risk assessment.</p>
+      
+      <h3>B. Risk Rating Scale</h3>
+      <table class="summary-table">
+        <tr>
+          <th>Severity</th>
+          <th>Description</th>
+          <th>Recommended Response</th>
+        </tr>
+        <tr>
+          <td style="color: #ea384c; font-weight: bold;">Critical</td>
+          <td>Vulnerabilities that pose an immediate threat to the environment and should be remediated as soon as possible.</td>
+          <td>Immediate remediation required</td>
+        </tr>
+        <tr>
+          <td style="color: #f97316; font-weight: bold;">High</td>
+          <td>Vulnerabilities that pose a significant risk to the environment and should be remediated promptly.</td>
+          <td>Remediate within 30 days</td>
+        </tr>
+        <tr>
+          <td style="color: #eab308; font-weight: bold;">Medium</td>
+          <td>Vulnerabilities that pose a moderate risk to the environment and should be remediated as part of regular maintenance.</td>
+          <td>Remediate within 90 days</td>
+        </tr>
+        <tr>
+          <td style="color: #22c55e; font-weight: bold;">Low</td>
+          <td>Vulnerabilities that pose a minimal risk to the environment and can be remediated during regular maintenance cycles.</td>
+          <td>Address during regular maintenance</td>
+        </tr>
+        <tr>
+          <td style="color: #3b82f6; font-weight: bold;">Informational</td>
+          <td>Findings that do not pose a security risk but are provided for awareness.</td>
+          <td>No action required</td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  // Close the document
+  reportContent += `
+    <div class="footer">
+      <p>Vulnerability Assessment Report - ${companyDetails.companyName} - ${companyDetails.reportDate.toLocaleDateString()}</p>
+      <p class="page-number">Page </p>
+    </div>
+    </body>
+    </html>
+  `;
 
   if (onProgress) {
     onProgress(100);
